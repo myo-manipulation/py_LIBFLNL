@@ -1,0 +1,48 @@
+# depslib dependency file v1.0
+1389224363 source:/home/vincent/These/SystTpsReel/Soft/ClientServeur/TestLinux/main.cpp
+	<stdlib.h>
+	"include/server.hpp"
+
+1273849517 /home/vincent/These/SystTpsReel/Soft/ClientServeur/TestLinux/include/server.hpp
+	<stdio.h>
+	<unistd.h>
+	<errno.h>
+	<string.h>
+	<winsock.h>
+	"pthread.h"
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<pthread.h>
+
+1595153791 source:/home/vincent/Mbed/libFLNL/example/main.cpp
+	<stdlib.h>
+	<time.h>
+	"FLNL.h"
+
+1594541625 /home/vincent/Mbed/libFLNL/src/server.h
+	<stdio.h>
+	<unistd.h>
+	<errno.h>
+	<string.h>
+	<winsock.h>
+	"pthread/pthread.h"
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<pthread.h>
+
+1595486353 /home/vincent/Mbed/libFLNL/src/FLNL.h
+	<stdio.h>
+	<unistd.h>
+	<assert.h>
+	<signal.h>
+	<errno.h>
+	<string.h>
+	<winsock.h>
+	"pthread.h"
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<pthread.h>
+
