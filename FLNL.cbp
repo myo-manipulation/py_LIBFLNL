@@ -36,8 +36,6 @@
 			</Target>
 		</Build>
 		<Compiler>
-			<Add option="-Wall" />
-			<Add option="-g" />
 			<Add option="-fPIC" />
 		</Compiler>
 		<Unit filename="src/FLNL.h" />

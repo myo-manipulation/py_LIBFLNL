@@ -21,7 +21,6 @@ int main()
     }
 
 
-
     double i[3];
     i[0]=0.1;i[1]=0;i[2]=0;
     double t=0;

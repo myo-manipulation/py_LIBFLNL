@@ -3,7 +3,7 @@
  *  \section intro_sec Inroduction
  *  This documentation describes the different classes of a network client/server library. This library ables to send double values between two systems (a client and a server). <BR>
  * A server have to be created in a first time, waiting for a connection. Then a client on a remote machine could connect to it (with ip address) and so the communication could began.<BR>
- * The library could be compiled under Linux and Windows.
+ * The library could be compiled under Linux and Windows (choose the corresponding target in Code::Blocks project).
  *
  *  \subsection sub_linux Linux
  *  For Linux the project generates the file libFLNL.so in the unix directory.
