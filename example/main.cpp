@@ -47,6 +47,16 @@ int main()
                 monServer->GetReceivedValues(a);
                 std::cout << t << " =? " << a[0] << " " << t-a[0] << std::endl;
             }
+            if(monServer->IsReceivedCmd())
+            {
+                char ss[255];
+                monServer->GetReceivedCmd(ss);
+                printf("%s\n", ss);
+                if(strcmp(ss, "magic_cmd")==0)
+                {
+                    monServer->Send("OK");
+                }
+            }
             usleep(100000);
         }
     }

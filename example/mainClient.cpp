@@ -14,13 +14,13 @@ int main()
 {
 	usleep(2000000);
     client *monClient;
-    monClient=new client(3, 6);
-    if(monClient->Connect("192.168.6.2")!=0)
+    monClient=new client(2, 3);
+    if(monClient->Connect("192.168.1.100")!=0)
     {
         exit(-1);
     }
 
-    double i[3]={0,0, 0};
+    double i[3]={0,0,0};
     float m=0;
     double t=0;
     struct timespec ts;
@@ -30,19 +30,30 @@ int main()
     {
         clock_gettime(CLOCK_MONOTONIC, &ts);
         t = timeval_to_sec(&ts);
-
-		m+=0.00001;
-        i[2]=m*9.8;
-        monClient->Send(i);
+        i[0]=t;
 
         if(monClient->IsReceivedValues())
         {
             monClient->GetReceivedValues(a);
-            //std::cout << t << " =? " << a[0] << " " << t-a[0] << std::endl;
-            for(int k=0; k<6; k++)
+            std::cout << t << " =? " << a[0] << " " << t-a[0] << std::endl;
+            /*for(int k=0; k<6; k++)
                 std::cout << a[k] << "\t";
-            std::cout << std::endl;
+            std::cout << std::endl;*/
         }
+        m+=0.00;
+        i[2]=-4.*a[5];
+        monClient->Send(i);
+
+        if(monClient->IsReceivedCmd())
+        {
+            char ss[255];
+            monClient->GetReceivedCmd(ss);
+            printf("%s\n", ss);
+        }
+
+        if(rand()%1000==1)
+            monClient->Send("magic_cmd");
+
         usleep(10);
     }
     std::cout <<  "Closing..." << std::endl;
