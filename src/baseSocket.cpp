@@ -137,6 +137,13 @@ void baseSocket::GetReceivedValues(double val[])
     IsValues=false;
 }
 
+
+void unlock_mutex(void * m)
+{
+    pthread_mutex_t * mut = (pthread_mutex_t *)m;
+    pthread_mutex_unlock(mut);
+}
+
 //! Thread function waiting for data from remote side
 //! \param c : A pointer on the baseSocket object
 //! \return NULL
@@ -206,10 +213,9 @@ void * receiving(void * c)
                 if(command_hash==toprocess[i]) {
                     //Copy received values
                     pthread_mutex_lock(&local->received_mutex);
-                    pthread_cleanup_push((void (*)(void *))pthread_mutex_unlock, (void *)&local->received_mutex); //Ensure that mutex will be unlock on thread cancelation (disconnect)
+                    pthread_cleanup_push(unlock_mutex, (void *)&local->received_mutex); //Ensure that mutex will be unlock on thread cancelation (disconnect)
                     memcpy(local->ReceivedValues, &toprocess[2], local->NbValuesToReceive*sizeof(double));
-                    pthread_mutex_unlock(&local->received_mutex);
-                    pthread_cleanup_pop(1); //no unlock on cancellation required anymore at this point
+                    pthread_cleanup_pop(1); //unlock mutex
                     local->IsValues=true;
                 }
                 else {
