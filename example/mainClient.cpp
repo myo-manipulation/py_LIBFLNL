@@ -1,13 +1,8 @@
 //Compilation: g++ mainClient.cpp -L lib -l FLNL -lpthread -o Client
 #include <iostream>
-#include <time.h>
+#include <chrono>
 
 #include "FLNL.h"
-
-double timeval_to_sec(struct timespec *ts)
-{
-    return (double)(ts->tv_sec + ts->tv_nsec / 1000000000.0);
-}
 
 
 int main()
@@ -22,15 +17,16 @@ int main()
 
     double i[3]={0,0,0};
     float m=0;
-    double t=0;
-    struct timespec ts;
     double a[6];
+    double t;
+    auto t0 = std::chrono::steady_clock::now();
 
     while(monClient->IsConnected())
     {
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        t = timeval_to_sec(&ts);
-        i[0]=t;
+        auto t1 = std::chrono::steady_clock::now();
+        std::chrono::duration<double, std::milli> t_ms = t1-t0;
+        t = t_ms.count()/1000.;
+        i[0] = t;
 
         if(monClient->IsReceivedValues())
         {

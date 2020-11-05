@@ -1,14 +1,10 @@
 //Compilation: g++ main.cpp -L lib -l FLNL -lpthread -o Server
 
 #include <iostream>
-#include <time.h>
+#include <chrono>
 
 #include "FLNL.h"
 
-double timeval_to_sec(struct timespec *ts)
-{
-    return (double)(ts->tv_sec + ts->tv_nsec / 1000000000.0);
-}
 
 int main()
 {
@@ -24,21 +20,21 @@ int main()
     double i[3];
     i[0]=0.1;i[1]=0;i[2]=0;
     double t=0;
-    struct timespec ts;
     double a[2];
-
 
     while(!monServer->IsConnected())
     {
         monServer->Reconnect();
         usleep(1000);
 
+        auto t0 = std::chrono::steady_clock::now();
         while(monServer->IsConnected())
         {
-            clock_gettime(CLOCK_MONOTONIC, &ts);
-            t = timeval_to_sec(&ts);
-
+            auto t1 = std::chrono::steady_clock::now();
+            std::chrono::duration<double, std::milli> t_ms = t1-t0;
+            t = t_ms.count()/1000.;
             i[0]=t;
+
             if(t>3)
                 monServer->Send(i);
 

@@ -17,9 +17,8 @@
 //! \param nb_values_to_send : Number of double values the server send to the client
 //! \param nb_values_to_receive : Number of double values the server receive from the client
 baseSocket::baseSocket(unsigned char nb_values_to_send, unsigned char nb_values_to_receive):
-                        NbValuesToSend(nb_values_to_send),
-                        NbValuesToReceive(nb_values_to_receive)
-{
+    NbValuesToSend(nb_values_to_send),
+    NbValuesToReceive(nb_values_to_receive) {
     //Ensure standard size of double
     assert(sizeof(double) == EXPECTED_DOUBLE_SIZE);
 
@@ -36,15 +35,14 @@ baseSocket::baseSocket(unsigned char nb_values_to_send, unsigned char nb_values_
 
     pthread_mutex_init(&received_mutex, NULL);
 
-    #ifdef WINDOWS
-        WSADATA WSAData;
-        WSAStartup(MAKEWORD(2,0), &WSAData);
-    #endif
+#ifdef WINDOWS
+    WSADATA WSAData;
+    WSAStartup(MAKEWORD(2,0), &WSAData);
+#endif
 }
 
 //! Destructor releasing memory and closing the socket
-baseSocket::~baseSocket()
-{
+baseSocket::~baseSocket() {
     Disconnect();
     pthread_mutex_destroy(&received_mutex);
     delete[] ReceivedValues;
@@ -60,19 +58,17 @@ baseSocket::~baseSocket()
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Disconnect and close the socket
 //! \return the close(Socket) return value
-int baseSocket::Disconnect()
-{
+int baseSocket::Disconnect() {
     pthread_cancel(ReceivingThread);
     Connected=false;
 
     int ret=close(Socket);
     if(ret==0) {
         printf("FLNL::Disconnected.\n");
-        #ifdef WINDOWS
-            WSACleanup();
-        #endif
-    }
-    else {
+#ifdef WINDOWS
+        WSACleanup();
+#endif
+    } else {
         printf("FLNL::Error closing connection.\n");
     }
 
@@ -81,8 +77,7 @@ int baseSocket::Disconnect()
 
 //! Tell if connected
 //! \return TRUE if connected to the server, FALSE otherwise
-bool baseSocket::IsConnected()
-{
+bool baseSocket::IsConnected() {
     return Connected;
 }
 /*#################################################################################################################*/
@@ -95,8 +90,7 @@ bool baseSocket::IsConnected()
 //! Send double values accross
 //! \param values : A pointer on a tab of doubles of NbValuesToSend elements
 //! \return the send() return value
-int baseSocket::Send(double * values)
-{
+int baseSocket::Send(double * values) {
     //Convert double values in char tab
     unsigned int size_of_values_in_char = NbValuesToSend*sizeof(double);
     unsigned char values_in_char[size_of_values_in_char];
@@ -111,17 +105,21 @@ int baseSocket::Send(double * values)
     }
     full_command[2+size_of_values_in_char]=command_hash;
     //Send the char array (MSG_NOSIGNAL required to avoid SIGPIPE signal which will break server on lost connection)
-    return send(Socket, full_command, size_of_values_in_char+3, MSG_NOSIGNAL);
+    #ifdef WINDOWS
+        int signals=0;
+    #else
+        int signals=MSG_NOSIGNAL;
+    #endif
+    return send(Socket, (char*) full_command, size_of_values_in_char+3, signals);
 }
 
 //! Send a command string
 //! \param cmd : The command string to send. Should be shorter than NbValuesToSend*sizeof(double) bytes.
 //! \return the send() return value
-int baseSocket::Send(const char* cmd)
-{
+int baseSocket::Send(const char* cmd) {
     unsigned int size_of_values_in_char = NbValuesToSend*sizeof(double);
     unsigned int cmd_len=strlen(cmd);
-    if(cmd_len>size_of_values_in_char){
+    if(cmd_len>size_of_values_in_char) {
         cmd_len = size_of_values_in_char;
         #ifdef VERBOSE
         printf("FLNL::Command too long (%s): truncated.\n", cmd);
@@ -147,7 +145,12 @@ int baseSocket::Send(const char* cmd)
     full_command[2+size_of_values_in_char]=command_hash;
 
     //Send the char array (MSG_NOSIGNAL required to avoid SIGPIPE signal which will break server on lost connection)
-    return send(Socket, full_command, size_of_values_in_char+3, MSG_NOSIGNAL);
+    #ifdef WINDOWS
+        int signals=0;
+    #else
+        int signals=MSG_NOSIGNAL;
+    #endif
+    return send(Socket, (char *)full_command, size_of_values_in_char+3, signals);
 }
 /*#################################################################################################################*/
 
@@ -159,15 +162,13 @@ int baseSocket::Send(const char* cmd)
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Tell if values have been received since last GetReceivedValues()
 //! \return TRUE if values have been received, FALSE otherwise
-bool baseSocket::IsReceivedValues()
-{
+bool baseSocket::IsReceivedValues() {
     return IsValues;
 }
 
 //! Return the last received values
 //! \param An array (allocated) of doubles of NbValuesToReceive elements
-void baseSocket::GetReceivedValues(double val[])
-{
+void baseSocket::GetReceivedValues(double val[]) {
     pthread_mutex_lock(&received_mutex);
     for(unsigned int i=0; i<NbValuesToReceive; i++)
         val[i]=ReceivedValues[i];
@@ -177,21 +178,18 @@ void baseSocket::GetReceivedValues(double val[])
 
 //! Tell if a new command has been received since last GetReceivedCmd()
 //! \return TRUE if command has been received, FALSE otherwise
-bool baseSocket::IsReceivedCmd()
-{
+bool baseSocket::IsReceivedCmd() {
     return IsCmd;
 }
 
 //! Return the last received cmd
 //! \param A character array of length at least NbValuesToReceive*sizeof(double)
-void baseSocket::GetReceivedCmd(char * cmd)
-{
+void baseSocket::GetReceivedCmd(char * cmd) {
     strncpy(cmd, ReceivedCmd, NbValuesToReceive*sizeof(double));
     IsCmd=false;
 }
 
-void unlock_mutex(void * m)
-{
+void unlock_mutex(void * m) {
     pthread_mutex_t * mut = (pthread_mutex_t *)m;
     pthread_mutex_unlock(mut);
 }
@@ -199,8 +197,7 @@ void unlock_mutex(void * m)
 //! Thread function waiting for data from remote side
 //! \param c : A pointer on the baseSocket object
 //! \return NULL
-void * receiving(void * c)
-{
+void * receiving(void * c) {
     baseSocket * local=(baseSocket*)c;
 
     short int msg_length=local->NbValuesToReceive*sizeof(double)+3;
@@ -210,7 +207,7 @@ void * receiving(void * c)
     short int remainingtoprocess_n=0;
 
     while(local->Connected) {
-        int ret=recv(local->Socket, rcvchars, msg_length, 0);
+        int ret=recv(local->Socket, (char *)rcvchars, msg_length, 0);
         if(ret==msg_length) {
             //Is it a CMD?
             if(rcvchars[0]=='C' && rcvchars[1]=='M') {
@@ -220,16 +217,16 @@ void * receiving(void * c)
                 for(i=2; i<ret-1; i++) {
                     command_hash ^= rcvchars[i];
                 }
-                if(command_hash==rcvchars[i]){
+                if(command_hash==rcvchars[i]) {
                     strncpy(local->ReceivedCmd, (char*)&rcvchars[2], msg_length-3);
                     local->IsCmd=true;
                 }
+                #ifdef VERBOSE
                 else {
                     //Incorrect values
-                    #ifdef VERBOSE
                     printf("FLNL::Error receiving (wrong hash).\n");
-                    #endif
                 }
+                #endif
                 //discard any previous remaining data
                 remainingtoprocess_n=0;
             }
@@ -292,30 +289,33 @@ void * receiving(void * c)
                         pthread_cleanup_pop(1); //unlock mutex
                         local->IsValues=true;
                     }
+                    #ifdef VERBOSE
                     else {
                         //Incorrect values
-                        #ifdef VERBOSE
                         printf("FLNL::Error receiving (wrong hash).\n");
-                        #endif
                     }
-                }
-                else {
-                    //Incorrect values
-                    #ifdef VERBOSE
-                    printf("FLNL::Error receiving (wrong data format).\n");
                     #endif
                 }
+                #ifdef VERBOSE
+                else {
+                    //Incorrect values
+                    printf("FLNL::Error receiving (wrong data format).\n");
+                }
+                #endif
             }
         }
         else if(ret<0) {
+            #ifdef VERBOSE
             #ifdef WINDOWS
-                printf("WSA Error code : %d\t", WSAGetLastError());
+            printf("WSA Error code : %d\n", WSAGetLastError());
             #endif
             perror("FLNL::Error receiving");
+            #endif
             if(errno==EBADF) { //Connection has been closed by client
                 local->Disconnect();
             }
-        } else if(ret==0) {
+        }
+        else if(ret==0) {
             //Connection has been reseted
             local->Disconnect();
         }

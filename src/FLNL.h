@@ -38,17 +38,15 @@
 #include <errno.h>
 #include <string.h>
 
-
-#ifdef WIN32
-    #define WINDOWS
-#endif
-#ifdef X64
+#if defined(_WIN32) || defined(WIN32) || defined(X64)
     #define WINDOWS
 #endif
 
 #ifdef WINDOWS
-    #include <winsock.h>
+    #include <winsock2.h>
     #include "pthread.h"
+    //Fix for error on macro expension on windows pthread
+    #define pthread_cleanup_pop(E) (*pthread_getclean() = _pthread_cup.next,(E?_pthread_cup.func((pthread_once_t *)_pthread_cup.arg):void(0)));}
 #else
     #include <sys/socket.h>
     #include <netinet/in.h>
@@ -58,7 +56,7 @@
 
 
 #define EXPECTED_DOUBLE_SIZE 8 //Size expected for the doubles: will be checked at startup and should be same on server and client size
-#define VERBOSE //Talkative ? (connection, every missed message...)
+//#define VERBOSE //Talkative ? (connection, every missed message...)
 
 void * receiving(void *c);
 
