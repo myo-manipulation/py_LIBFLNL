@@ -9,7 +9,7 @@
 int main()
 {
     server *monServer;
-    monServer=new server(3, 2);
+    monServer=new server();
 
     if(monServer->Connect("192.168.1.100")!=0)
     {
@@ -17,10 +17,9 @@ int main()
     }
 
 
-    double i[3];
-    i[0]=0.1;i[1]=0;i[2]=0;
+    std::vector<double> i({0.1, 42.0, 54.0});
     double t=0;
-    double a[2];
+    std::vector<double> a(2);
 
     while(!monServer->IsConnected())
     {
@@ -45,15 +44,22 @@ int main()
             }
             if(monServer->IsReceivedCmd())
             {
-                char ss[255];
-                monServer->GetReceivedCmd(ss);
-                printf("%s\n", ss);
-                if(strcmp(ss, "magic_cmd")==0)
+                std::string ss;
+                monServer->GetReceivedCmd(ss, a);
+                std::cout << ss << "(" << a[0] << ")" << std::endl;
+                if(ss == "move")
                 {
                     monServer->Send("OK");
                 }
             }
-            usleep(100000);
+            usleep(1000);
+
+            //Randomly pause to test asynchronicity
+            if(rand()%1000==1){
+                std::cout << "Pause" <<std::endl;
+                for(int i=0; i<50; i++)
+                    usleep(100000);
+            }
         }
     }
 

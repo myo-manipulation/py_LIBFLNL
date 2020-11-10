@@ -2,8 +2,8 @@
  * \file baseSocket.cpp
  * \brief Network base class implementation
  * \author Vincent Crocher
- * \version 0.8
- * \date July 2020
+ * \version 1.1
+ * \date November 2020
  *
  *
  */
@@ -14,24 +14,21 @@
 /*#########################################   CONSTRUCTOR AND DESTRUCTOR   ########################################*/
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Constructor initializing data and creating a socket
-//! \param nb_values_to_send : Number of double values the server send to the client
-//! \param nb_values_to_receive : Number of double values the server receive from the client
-baseSocket::baseSocket(unsigned char nb_values_to_send, unsigned char nb_values_to_receive):
-    NbValuesToSend(nb_values_to_send),
-    NbValuesToReceive(nb_values_to_receive) {
+baseSocket::baseSocket():
+    MaxNbValues(floor((MESSAGE_SIZE-3-CMD_SIZE)/(float)sizeof(double))) {
     //Ensure standard size of double
     assert(sizeof(double) == EXPECTED_DOUBLE_SIZE);
 
     //Initialise sin
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(2048);
 
     //Initialise and allocates privates
     Socket=-1;
     IsValues=false;
     Connected=false;
-    ReceivedValues=new double[NbValuesToReceive];
-    ReceivedCmd=new char[sizeof(ReceivedValues)];
+    ReceivedValues=new double[MaxNbValues];
+    ReceivedCmd=new char[CMD_SIZE+1];
+    ReceivedCmdParams=new double[MaxNbValues];
 
     pthread_mutex_init(&received_mutex, NULL);
 
@@ -47,6 +44,7 @@ baseSocket::~baseSocket() {
     pthread_mutex_destroy(&received_mutex);
     delete[] ReceivedValues;
     delete[] ReceivedCmd;
+    delete[] ReceivedCmdParams;
 }
 /*#################################################################################################################*/
 
@@ -83,66 +81,48 @@ bool baseSocket::IsConnected() {
 /*#################################################################################################################*/
 
 
+/*-----------------------------------------------------------------------------------------------------------------*/
+/*###################################################   HELPERS   #################################################*/
+/*-----------------------------------------------------------------------------------------------------------------*/
+//! Compute and return the checksum for a message
+unsigned char Checksum(unsigned char *full_message)
+{
+    unsigned char command_hash = 0;
+    for(unsigned int i=2; i<MESSAGE_SIZE-1; i++) {
+        command_hash ^= full_message[i];
+    }
+    return command_hash;
+}
+
+
+/*#################################################################################################################*/
 
 /*-----------------------------------------------------------------------------------------------------------------*/
 /*###############################################   SENDING METHODS   #############################################*/
 /*-----------------------------------------------------------------------------------------------------------------*/
-//! Send double values accross
-//! \param values : A pointer on a tab of doubles of NbValuesToSend elements
-//! \return the send() return value
-int baseSocket::Send(double * values) {
-    //Convert double values in char tab
-    unsigned int size_of_values_in_char = NbValuesToSend*sizeof(double);
-    unsigned char values_in_char[size_of_values_in_char];
-    memcpy(values_in_char, values, size_of_values_in_char);
-    unsigned char full_command[size_of_values_in_char + 3];
-    full_command[0]=InitCode;
-    full_command[1]=NbValuesToSend;
-    unsigned char command_hash = 0;
-    for(unsigned int i=0; i<size_of_values_in_char; i++) {
-        full_command[2+i] = values_in_char[i];
-        command_hash ^= values_in_char[i];
-    }
-    full_command[2+size_of_values_in_char]=command_hash;
-    //Send the char array (MSG_NOSIGNAL required to avoid SIGPIPE signal which will break server on lost connection)
-    #ifdef WINDOWS
-        int signals=0;
-    #else
-        int signals=MSG_NOSIGNAL;
-    #endif
-    return send(Socket, (char*) full_command, size_of_values_in_char+3, signals);
-}
-
-//! Send a command string
-//! \param cmd : The command string to send. Should be shorter than NbValuesToSend*sizeof(double) bytes.
-//! \return the send() return value
-int baseSocket::Send(const char* cmd) {
-    unsigned int size_of_values_in_char = NbValuesToSend*sizeof(double);
-    unsigned int cmd_len=strlen(cmd);
-    if(cmd_len>size_of_values_in_char) {
-        cmd_len = size_of_values_in_char;
-        #ifdef VERBOSE
-        printf("FLNL::Command too long (%s): truncated.\n", cmd);
-        #endif
-    }
-
-    unsigned char cmdtosend[size_of_values_in_char];
-    //Keep only maximum sizeof(double) length of the cmd
-    memcpy(cmdtosend, cmd, cmd_len);
-    //pad with zeroes
-    for(unsigned int i=cmd_len; i<size_of_values_in_char; i++)
-        cmdtosend[i]='\0';
+//! Send a vector of double values accross
+//! \param values : A vector of doubles to send. Should be less values than MaxNbValues.
+//! \return -1 if wrong values size, the send() return value otherwise
+int baseSocket::Send(const std::vector<double> &values) {
+    if(values.size()>MaxNbValues)
+        return -1;
 
     //Init codes and checksum
-    unsigned char full_command[size_of_values_in_char + 3];
-    full_command[0]='C';
-    full_command[1]='M';
-    unsigned char command_hash = 0;
-    for(unsigned int i=0; i<size_of_values_in_char; i++) {
-        full_command[2+i] = cmdtosend[i];
-        command_hash ^= cmdtosend[i];
+    unsigned int idx=0;
+    FullMessageOut[idx++]='V';
+    FullMessageOut[idx++]=values.size();
+    //Add values
+    for(unsigned int i=0; i<values.size(); i++) {
+        memcpy(FullMessageOut+idx, &values[i], sizeof(double));
+        idx+=sizeof(double);
     }
-    full_command[2+size_of_values_in_char]=command_hash;
+    //Pad with 0s
+    for(unsigned int i=idx; i<MESSAGE_SIZE; i++) {
+        FullMessageOut[i]=0;
+    }
+
+    //Compute and add hash
+    FullMessageOut[MESSAGE_SIZE-1]=Checksum(FullMessageOut);
 
     //Send the char array (MSG_NOSIGNAL required to avoid SIGPIPE signal which will break server on lost connection)
     #ifdef WINDOWS
@@ -150,7 +130,52 @@ int baseSocket::Send(const char* cmd) {
     #else
         int signals=MSG_NOSIGNAL;
     #endif
-    return send(Socket, (char *)full_command, size_of_values_in_char+3, signals);
+    return send(Socket, (char *)FullMessageOut, MESSAGE_SIZE, signals);
+}
+
+
+//! Send a command with parameters
+//! \param cmd : The command string to send (4 characters)
+//! \param param: A vector of doubles containing the command parameters to send (optional)
+//! \return -1 if wrong params size, the send() return value otherwise
+int baseSocket::Send(const std::string &cmd, const std::vector<double> &params) {
+    if(params.size()>MaxNbValues)
+        return -1;
+
+    //Init codes
+    unsigned int idx=0;
+    FullMessageOut[idx++]='C';
+    FullMessageOut[idx++]=params.size();
+    //Copy cmd (pad if less than CMD_SIZE)
+    if(cmd.size()<CMD_SIZE) {
+        memcpy(FullMessageOut+idx, cmd.c_str(), cmd.size());
+        for(unsigned int i=cmd.size(); i<CMD_SIZE; i++)
+            FullMessageOut[idx+i] = '\0';
+    }
+    else {
+       memcpy(FullMessageOut+idx, cmd.c_str(), CMD_SIZE);
+    }
+    idx+=CMD_SIZE;
+    //Add parameters
+    for(unsigned int i=0; i<params.size(); i++) {
+        memcpy(FullMessageOut+idx, &params[i], sizeof(double));
+        idx+=sizeof(double);
+    }
+    //Pad with 0s
+    for(unsigned int i=idx; i<MESSAGE_SIZE; i++) {
+        FullMessageOut[i]=0;
+    }
+
+    //Compute and add hash
+    FullMessageOut[MESSAGE_SIZE-1]=Checksum(FullMessageOut);
+
+    //Send the char array (MSG_NOSIGNAL required to avoid SIGPIPE signal which will break server on lost connection)
+    #ifdef WINDOWS
+        int signals=0;
+    #else
+        int signals=MSG_NOSIGNAL;
+    #endif
+    return send(Socket, (char *)FullMessageOut, MESSAGE_SIZE, signals);
 }
 /*#################################################################################################################*/
 
@@ -158,7 +183,7 @@ int baseSocket::Send(const char* cmd) {
 
 
 /*-----------------------------------------------------------------------------------------------------------------*/
-/*############################################  RECIVING METHODS  #################################################*/
+/*############################################  RECEIVING METHODS  #################################################*/
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Tell if values have been received since last GetReceivedValues()
 //! \return TRUE if values have been received, FALSE otherwise
@@ -167,12 +192,16 @@ bool baseSocket::IsReceivedValues() {
 }
 
 //! Return the last received values
-//! \param An array (allocated) of doubles of NbValuesToReceive elements
-void baseSocket::GetReceivedValues(double val[]) {
+//! \param A reference to a vector to store values
+void baseSocket::GetReceivedValues(std::vector<double> &vals) {
     pthread_mutex_lock(&received_mutex);
-    for(unsigned int i=0; i<NbValuesToReceive; i++)
-        val[i]=ReceivedValues[i];
+    if(vals.size()!=NbReceivedValues)
+        vals.resize(NbReceivedValues);
+
+    for(unsigned int i=0; i<NbReceivedValues; i++)
+        vals[i]=ReceivedValues[i];
     pthread_mutex_unlock(&received_mutex);
+
     IsValues=false;
 }
 
@@ -183,9 +212,17 @@ bool baseSocket::IsReceivedCmd() {
 }
 
 //! Return the last received cmd
-//! \param A character array of length at least NbValuesToReceive*sizeof(double)
-void baseSocket::GetReceivedCmd(char * cmd) {
-    strncpy(cmd, ReceivedCmd, NbValuesToReceive*sizeof(double));
+//! \param A string reference to be receive the command string (4 characters)
+//! \param A reference to a vector to store command parameters
+void baseSocket::GetReceivedCmd(std::string &cmd, std::vector<double> &params) {
+    if(params.size()!=NbReceivedCmdParams)
+        params.resize(NbReceivedCmdParams);
+
+    for(unsigned int i=0; i<NbReceivedCmdParams; i++)
+        params[i]=ReceivedCmdParams[i];
+
+    cmd.assign(ReceivedCmd);
+
     IsCmd=false;
 }
 
@@ -200,109 +237,117 @@ void unlock_mutex(void * m) {
 void * receiving(void * c) {
     baseSocket * local=(baseSocket*)c;
 
-    short int msg_length=local->NbValuesToReceive*sizeof(double)+3;
-    unsigned char rcvchars[msg_length];
-    unsigned char toprocess[msg_length];
-    unsigned char remainingtoprocess[msg_length];
     short int remainingtoprocess_n=0;
 
     while(local->Connected) {
-        int ret=recv(local->Socket, (char *)rcvchars, msg_length, 0);
-        if(ret==msg_length) {
+        //Read a full frame
+        int ret=recv(local->Socket, (char *)local->FullMessageIn, MESSAGE_SIZE, 0);
+        if(ret==MESSAGE_SIZE) {
+            bool cksum_ok = false;
+            if(Checksum(local->FullMessageIn)==local->FullMessageIn[MESSAGE_SIZE-1])
+                cksum_ok = true;
+
             //Is it a CMD?
-            if(rcvchars[0]=='C' && rcvchars[1]=='M') {
+            if(local->FullMessageIn[0]==local->InitCommandCode && cksum_ok) {
                 //then use it as a command
-                unsigned char command_hash = 0;
-                unsigned int i;
-                for(i=2; i<ret-1; i++) {
-                    command_hash ^= rcvchars[i];
-                }
-                if(command_hash==rcvchars[i]) {
-                    strncpy(local->ReceivedCmd, (char*)&rcvchars[2], msg_length-3);
+                unsigned short int nb_params = local->FullMessageIn[1];
+                if(nb_params<=local->MaxNbValues) {
+                    //Process
+                    local->NbReceivedCmdParams = nb_params;
+                    memcpy(local->ReceivedCmd, &local->FullMessageIn[2], CMD_SIZE);
+                    local->ReceivedCmd[CMD_SIZE]='\0';
+                    //parameters
+                    memcpy(local->ReceivedCmdParams, &local->FullMessageIn[2+CMD_SIZE], nb_params*sizeof(double));
                     local->IsCmd=true;
                 }
                 #ifdef VERBOSE
                 else {
                     //Incorrect values
-                    printf("FLNL::Error receiving (wrong hash).\n");
+                    printf("FLNL::Error receiving (wrong number of params).\n");
                 }
                 #endif
                 //discard any previous remaining data
                 remainingtoprocess_n=0;
             }
-            else {
-                //If just recv msg looks ok (first characters)
-                if(rcvchars[0]==local->InitCode && rcvchars[1]==local->NbValuesToReceive) {
-                    //then use it as it is
-                    memcpy(toprocess, rcvchars, msg_length);
-                    //discard any previous remaining data
-                    remainingtoprocess_n=0;
-                }
-                else {
-                    //Use stored init part of message in buffer if any
-                    memcpy(toprocess, remainingtoprocess, remainingtoprocess_n);
-                    //concatenate with the begining of received sequence and use that
-                    memcpy(&toprocess[remainingtoprocess_n], rcvchars, msg_length-remainingtoprocess_n);
-
-                    /*printf("Pre:");
-                    for(int k=0; k<remainingtoprocess_n; k++)
-                        printf("%02X", remainingtoprocess[k]);
-                    printf(" + ");
-                    for(int k=0; k<ret; k++)
-                        printf("%02X", rcvchars[k]);
-                    printf(" = \nPre:");
-                    for(int k=0; k<msg_length; k++)
-                        printf("%02X", toprocess[k]);
-                    printf(" (%d+%d=?%d)\n", remainingtoprocess_n, ret, msg_length);*/
-
-                    //Store end of message for later use in buffer
-                    unsigned int i;
-                    for(i=msg_length-1; i>=0; i--) {
-                        remainingtoprocess_n=msg_length-i;
-                        if(rcvchars[i]==local->InitCode)
-                            break;
-                    }
-                    memcpy(remainingtoprocess, &rcvchars[i], remainingtoprocess_n);
-
-                    /*for(int k=0; k<remainingtoprocess_n; k++)
-                        printf("%02X", remainingtoprocess[k]);
-                    printf(" = \n");
-                    for(int k=0; k<remainingtoprocess_n; k++)
-                        printf("%02X", rcvchars[i+k]);
-                    printf(" (%d)\n\n", remainingtoprocess_n);*/
-                }
-
-                //Check init code and number of values are matching
-                if(toprocess[0]==local->InitCode && toprocess[1]==local->NbValuesToReceive) {
-                    //Compute and check hash
-                    unsigned char command_hash = 0;
-                    unsigned int i;
-                    for(i=2; i<ret-1; i++) {
-                        command_hash ^= toprocess[i];
-                    }
-
-                    if(command_hash==toprocess[i]) {
-                        //Copy received values
-                        pthread_mutex_lock(&local->received_mutex);
-                        pthread_cleanup_push(unlock_mutex, (void *)&local->received_mutex); //Ensure that mutex will be unlock on thread cancelation (disconnect)
-                        memcpy(local->ReceivedValues, &toprocess[2], local->NbValuesToReceive*sizeof(double));
-                        pthread_cleanup_pop(1); //unlock mutex
-                        local->IsValues=true;
-                    }
-                    #ifdef VERBOSE
-                    else {
-                        //Incorrect values
-                        printf("FLNL::Error receiving (wrong hash).\n");
-                    }
-                    #endif
+            //Is it values?
+            else if(local->FullMessageIn[0]==local->InitValueCode && cksum_ok) {
+                unsigned short int nb_values = local->FullMessageIn[1];
+                if(nb_values<=local->MaxNbValues) {
+                    pthread_mutex_lock(&local->received_mutex);
+                    pthread_cleanup_push(unlock_mutex, (void *)&local->received_mutex); //Ensure that mutex will be unlock on thread cancelation (disconnect)
+                    local->NbReceivedValues = nb_values;
+                    memcpy(local->ReceivedValues, &local->FullMessageIn[2], nb_values*sizeof(double));
+                    pthread_cleanup_pop(1); //unlock mutex
+                    local->IsValues=true;
                 }
                 #ifdef VERBOSE
                 else {
                     //Incorrect values
-                    printf("FLNL::Error receiving (wrong data format).\n");
+                    printf("FLNL::Error receiving (wrong number of values).\n");
                 }
                 #endif
+                remainingtoprocess_n=0;
             }
+//            else if() {
+//                //If just recv msg looks ok (init code and checksum)
+//                if(local->FullMessageIn[0]==local->InitValueCode && cksum_ok) {
+//                    //then use it as it is
+//                    unsigned short int nb_values = local->FullMessageIn[1];
+//
+//                    memcpy(local->ToProcess, local->FullMessageIn, MESSAGE_SIZE);
+//                    //discard any previous remaining data
+//                    remainingtoprocess_n=0;
+//                }
+//                else {
+//                    //Use stored init part of message in buffer if any
+//                    memcpy(local->ToProcess, local->MessageRemainingToProcess, remainingtoprocess_n);
+//                    //concatenate with the begining of received sequence and use that
+//                    memcpy(&local->ToProcess[remainingtoprocess_n], local->FullMessageIn, MESSAGE_SIZE-remainingtoprocess_n);
+//
+//                    /*printf("Pre:");
+//                    for(int k=0; k<remainingtoprocess_n; k++)
+//                        printf("%02X", local->MessageRemainingToProcess[k]);
+//                    printf(" + ");
+//                    for(int k=0; k<ret; k++)
+//                        printf("%02X", local->FullMessageIn[k]);
+//                    printf(" = \nPre:");
+//                    for(int k=0; k<MESSAGE_SIZE; k++)
+//                        printf("%02X", local->ToProcess[k]);
+//                    printf(" (%d+%d=?%d)\n", remainingtoprocess_n, ret, MESSAGE_SIZE);*/
+//
+//                    //Store end of message for later use in buffer
+//                    unsigned int i;
+//                    for(i=MESSAGE_SIZE-1; i>=0; i--) {
+//                        remainingtoprocess_n=MESSAGE_SIZE-i;
+//                        if(local->FullMessageIn[i]==local->InitValueCode)
+//                            break;
+//                    }
+//                    memcpy(local->MessageRemainingToProcess, &local->FullMessageIn[i], remainingtoprocess_n);
+//
+//                    /*for(int k=0; k<remainingtoprocess_n; k++)
+//                        printf("%02X", local->MessageRemainingToProcess[k]);
+//                    printf(" = \n");
+//                    for(int k=0; k<remainingtoprocess_n; k++)
+//                        printf("%02X", local->FullMessageIn[i+k]);
+//                    printf(" (%d)\n\n", remainingtoprocess_n);*/
+//                }
+//
+//                //Check init code and checksum
+//                if(local->ToProcess[0]==local->InitValueCode && Checksum(local->ToProcess)==local->ToProcess[MESSAGE_SIZE-1]) {
+//                    //Copy received values
+//                    pthread_mutex_lock(&local->received_mutex);
+//                    pthread_cleanup_push(unlock_mutex, (void *)&local->received_mutex); //Ensure that mutex will be unlock on thread cancelation (disconnect)
+//                    memcpy(local->ReceivedValues, &local->ToProcess[2], local->NbValuesToReceive*sizeof(double)); //TODO!!!!!!!!!!!!!!!!!!!!!
+//                    pthread_cleanup_pop(1); //unlock mutex
+//                    local->IsValues=true;
+//                }
+//                #ifdef VERBOSE
+//                else {
+//                    //Incorrect values
+//                    printf("FLNL::Error receiving (wrong code or checksum).\n");
+//                }
+//                #endif
+//            }
         }
         else if(ret<0) {
             #ifdef VERBOSE

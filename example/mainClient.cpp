@@ -9,15 +9,15 @@ int main()
 {
 	usleep(2000000);
     client *monClient;
-    monClient=new client(2, 3);
+    monClient=new client();
     if(monClient->Connect("192.168.1.100")!=0)
     {
         exit(-1);
     }
 
-    double i[3]={0,0,0};
+    std::vector<double> i({0,0,0});
     float m=0;
-    double a[6];
+    std::vector<double> a(6);
     double t;
     auto t0 = std::chrono::steady_clock::now();
 
@@ -42,13 +42,13 @@ int main()
 
         if(monClient->IsReceivedCmd())
         {
-            char ss[255];
-            monClient->GetReceivedCmd(ss);
-            printf("%s\n", ss);
+            std::string ss;
+            monClient->GetReceivedCmd(ss, a);
+            std::cout << ss << std::endl;
         }
 
         if(rand()%1000==1)
-            monClient->Send("magic_cmd");
+            monClient->Send("move", {2.56});
 
         usleep(10);
     }

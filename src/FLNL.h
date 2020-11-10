@@ -21,8 +21,8 @@
  * \file FLNL.h
  * \brief Network classes declaration
  * \author Vincent Crocher
- * \version 0.8
- * \date July 2020
+ * \version 1.1
+ * \date November 2020
  *
  *
  */
@@ -37,6 +37,9 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
+#include <vector>
+#include <string>
 
 #if defined(_WIN32) || defined(WIN32) || defined(X64)
     #define WINDOWS
@@ -54,13 +57,19 @@
     #include <pthread.h>
 #endif
 
-
+#define MESSAGE_SIZE 255 //Messages (frame) size in bytes
 #define EXPECTED_DOUBLE_SIZE 8 //Size expected for the doubles: will be checked at startup and should be same on server and client size
+#define CMD_SIZE 4 //Commands length in chars
 //#define VERBOSE //Talkative ? (connection, every missed message...)
 
 void * receiving(void *c);
 
-//! A network base class able to send and receive data (fixed number of doubles)
+//! A network base class able to send and receive data asynchronously as well as basic commands
+//! Allows to send and receive two types of messages (both of total length MESSAGE_SIZE bytes):
+//! 1) Asynchronous data values (doubles) without buffering (only latest one arrived is kept)
+//! The datagram is in the form 'V' - [NbValues] - [DoubleValue1InBytes] - ... - [DoubleValueNInBytes] - [0 padding] - [ChecksumByte]
+//! 2) Asynchronous command messages (4 characters) with arbitary nb of parameters (doubles), without buffering (only latest one arrived is kept)
+//! The datagram is in the form 'C' - [NbParams] - [CMD4CHARACTERS] - [DoubleValue1InBytes] - ... - [DoubleValueNInBytes] - [0 padding] - [ChecksumByte]
 class baseSocket
 {
     friend void * receiving(void *c);
@@ -68,13 +77,13 @@ class baseSocket
     public:
         //!@name Constructor and destructor
         //@{
-            baseSocket(unsigned char nb_values_to_send, unsigned char nb_values_to_receive);
+            baseSocket();
             ~baseSocket();
         //@}
 
         //!@name Connecting and disconnecting methods
         //@{
-            virtual int Connect(char * addr) = 0;
+            virtual int Connect(char * addr, short int port) = 0;
             virtual int Reconnect() {return 0;};
             virtual int Disconnect();
             bool IsConnected();
@@ -82,32 +91,41 @@ class baseSocket
 
         //!@name Sending methods
         //@{
-            int Send(double * values);
-            int Send(const char * cmd);
+            int Send(const std::vector<double> &values);
+            int Send(const std::string &cmd, const std::vector<double> &params={});
         //@}
 
         //!@name Receiving methods
         //@{
             bool IsReceivedValues();
-            void GetReceivedValues(double val[]);
+            void GetReceivedValues(std::vector<double> &vals);
             bool IsReceivedCmd();
-            void GetReceivedCmd(char * cmd);
+            void GetReceivedCmd(std::string &cmd, std::vector<double> &vals);
         //@}
 
     protected:
-        int Socket;                         //!< Local socket
-        struct sockaddr_in sin;             //!< Socket parameters structure
-        bool Connected;                     //!< TRUE if client is connected to a server, FALSE otherwise
-        unsigned char NbValuesToSend;       //!< Number of double values the client send to the server
-        unsigned char NbValuesToReceive;    //!< Number of double values the client receive from the server
-        const unsigned char InitCode = 'V';
-        double * ReceivedValues;            //!< Tab of the last received value from the server
-        double * ReceivedValuesCpy;         //!< Returned copy of the ReceivedValue
-        pthread_mutex_t received_mutex;     //!< Mutex protecting read/writes to received values
-        bool IsValues;                      //!< TRUE if last values are received (since last GetReceivedValues()), FALSE otherwise
+        int Socket;                                             //!< Local socket
+        struct sockaddr_in sin;                                 //!< Socket parameters structure
+        bool Connected;                                         //!< TRUE if client is connected to a server, FALSE otherwise
+        const unsigned short int MaxNbValues;                   //!< Max possible number of doubles to send in a frame (calculated from MESSAGE_SIZE and double size)
+        unsigned short int NbReceivedValues;                    //!< Number of double values received
+        unsigned short int NbReceivedCmdParams;                 //!< Number of parameters received with last command
+        const unsigned char InitValueCode = 'V';
+        const unsigned char InitCommandCode = 'C';
+
+        double * ReceivedValues;
+        bool IsValues;                                          //!< TRUE if last values are received (since last GetReceivedValues()), FALSE otherwise
         char * ReceivedCmd;
+        double * ReceivedCmdParams;
         bool IsCmd;
-        pthread_t ReceivingThread;          //!< Receiving pthread
+        pthread_mutex_t received_mutex;                         //!< Mutex protecting read/writes to received values
+        pthread_t ReceivingThread;                              //!< Receiving pthread
+
+    private:
+        unsigned char FullMessageOut[MESSAGE_SIZE];             // Preallocated buffer for outgoing messages
+        unsigned char FullMessageIn[MESSAGE_SIZE];              // Preallocated buffer for incoming messages
+        unsigned char MessageRemainingToProcess[MESSAGE_SIZE];  // Buffer for incoming messages processing
+        unsigned char ToProcess[MESSAGE_SIZE];                  // Buffer for incoming messages processing
 };
 
 
@@ -117,12 +135,12 @@ class client: public baseSocket
     public:
         //!@name Constructor and destructor
         //@{
-            client(unsigned char nb_values_to_send, unsigned char nb_values_to_receive): baseSocket(nb_values_to_send, nb_values_to_receive){};
+            client(): baseSocket(){};
         //@}
 
         //!@name Connecting and disconnecting methods
         //@{
-            int Connect(char * addr);
+            int Connect(char * addr, short int port = 2048);
         //@}
 };
 
@@ -136,18 +154,18 @@ class server: public baseSocket
     public:
         //!@name Constructor and destructor
         //@{
-            server(unsigned char nb_values_to_send, unsigned char nb_values_to_receive): baseSocket(nb_values_to_send, nb_values_to_receive), Waiting(false) { };
+            server(): baseSocket(), Waiting(false) { };
         //@}
 
         //!@name Connecting and disconnecting methods
         //@{
-            int Connect(char * addr);
+            int Connect(char * addr, short int port = 2048);
             int Disconnect();
             int Reconnect();
         //@}
 
     private:
-        int ServerSocket;                         //!< Server (accepting) socket
+        int ServerSocket;                   //!< Server (accepting) socket
         bool Waiting;                       //!< TRUE if server is currently waiting for incoming client, FALSE otherwise
         pthread_t AcceptingThread;          //!< Accepting connection (from client) pthread
 };

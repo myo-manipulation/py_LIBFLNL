@@ -15,13 +15,15 @@
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Try to connect to the server and create a receiving thread
 //! \param addr : The server ip address to connect to
+//! \param port : The communication port (default is 2048)
 //! \return 0 if OK
 //! \return -1 if connect() error
 //! \return -2 if error creating the receiving thread
-int client::Connect(char * addr)
+int client::Connect(char * addr, short int port)
 {
-    //Initialise server address
+    //Initialise server address and port
     sin.sin_addr.s_addr = inet_addr(addr);
+    sin.sin_port = htons(port);
 
     //Initialise socket
     Socket = socket(AF_INET, SOCK_STREAM, 0);

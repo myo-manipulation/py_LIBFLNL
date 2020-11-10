@@ -15,14 +15,16 @@
 /*###################################   CONNECTING AND DISCONNECTING METHODS    ###################################*/
 /*-----------------------------------------------------------------------------------------------------------------*/
 //! Open a connection and wait for a client launching an Accepting thread
-//! \param addr : The server ip address (local address)
+//! \param addr : The server ip address (local address to listen on)
+//! \param port : The server port (default is 2048)
 //! \return 0 if OK
 //! \return -1 if bind() error
 //! \return -2 if error creating the accepting thread
-int server::Connect(char * addr)
+int server::Connect(char * addr, short int port)
 {
-    //Initialise server address
+    //Initialise server address and ports
     sin.sin_addr.s_addr = inet_addr(addr);
+    sin.sin_port = htons(port);
 
     //Initialise server socket
     ServerSocket = socket(AF_INET, SOCK_STREAM, 0);
