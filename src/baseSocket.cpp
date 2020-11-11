@@ -193,7 +193,8 @@ bool baseSocket::IsReceivedValues() {
 
 //! Return the last received values
 //! \param A reference to a vector to store values
-void baseSocket::GetReceivedValues(std::vector<double> &vals) {
+//! \return The number of values received (size of vals)
+int baseSocket::GetReceivedValues(std::vector<double> &vals) {
     pthread_mutex_lock(&received_mutex);
     if(vals.size()!=NbReceivedValues)
         vals.resize(NbReceivedValues);
@@ -203,6 +204,8 @@ void baseSocket::GetReceivedValues(std::vector<double> &vals) {
     pthread_mutex_unlock(&received_mutex);
 
     IsValues=false;
+
+    return vals.size();
 }
 
 //! Tell if a new command has been received since last GetReceivedCmd()
@@ -214,7 +217,8 @@ bool baseSocket::IsReceivedCmd() {
 //! Return the last received cmd
 //! \param A string reference to be receive the command string (4 characters)
 //! \param A reference to a vector to store command parameters
-void baseSocket::GetReceivedCmd(std::string &cmd, std::vector<double> &params) {
+//! \return The number of parameters received (size of params)
+int baseSocket::GetReceivedCmd(std::string &cmd, std::vector<double> &params) {
     if(params.size()!=NbReceivedCmdParams)
         params.resize(NbReceivedCmdParams);
 
@@ -224,6 +228,8 @@ void baseSocket::GetReceivedCmd(std::string &cmd, std::vector<double> &params) {
     cmd.assign(ReceivedCmd);
 
     IsCmd=false;
+
+    return params.size();
 }
 
 void unlock_mutex(void * m) {

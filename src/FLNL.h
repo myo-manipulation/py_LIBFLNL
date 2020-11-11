@@ -98,9 +98,9 @@ class baseSocket
         //!@name Receiving methods
         //@{
             bool IsReceivedValues();
-            void GetReceivedValues(std::vector<double> &vals);
+            int GetReceivedValues(std::vector<double> &vals);
             bool IsReceivedCmd();
-            void GetReceivedCmd(std::string &cmd, std::vector<double> &vals);
+            int GetReceivedCmd(std::string &cmd, std::vector<double> &vals);
         //@}
 
     protected:

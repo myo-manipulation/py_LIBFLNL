@@ -46,10 +46,13 @@ int main()
             {
                 std::string ss;
                 monServer->GetReceivedCmd(ss, a);
-                std::cout << ss << "(" << a[0] << ")" << std::endl;
+                std::cout << ss << "( ";
+                for(int i=0; i<a.size(); i++)
+                    std::cout << a[i] << " ";
+                std::cout << ")" << std::endl;
                 if(ss == "move")
                 {
-                    monServer->Send("OK");
+                    monServer->Send("OK", {25});
                 }
             }
             usleep(1000);
