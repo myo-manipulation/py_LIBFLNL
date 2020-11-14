@@ -19,7 +19,7 @@
 //! \return 0 if OK
 //! \return -1 if connect() error
 //! \return -2 if error creating the receiving thread
-int client::Connect(char * addr, short int port)
+int client::Connect(const char * addr, short int port)
 {
     //Initialise server address and port
     sin.sin_addr.s_addr = inet_addr(addr);

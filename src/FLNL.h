@@ -65,7 +65,7 @@
 void * receiving(void *c);
 
 //! A network base class able to send and receive data asynchronously as well as basic commands
-//! Allows to send and receive two types of messages (both of total length MESSAGE_SIZE bytes):
+//! Allows to send and receive two types of messages (both of total fixed length MESSAGE_SIZE bytes):
 //! 1) Asynchronous data values (doubles) without buffering (only latest one arrived is kept)
 //! The datagram is in the form 'V' - [NbValues] - [DoubleValue1InBytes] - ... - [DoubleValueNInBytes] - [0 padding] - [ChecksumByte]
 //! 2) Asynchronous command messages (4 characters) with arbitary nb of parameters (doubles), without buffering (only latest one arrived is kept)
@@ -78,12 +78,12 @@ class baseSocket
         //!@name Constructor and destructor
         //@{
             baseSocket();
-            ~baseSocket();
+            virtual ~baseSocket();
         //@}
 
         //!@name Connecting and disconnecting methods
         //@{
-            virtual int Connect(char * addr, short int port) = 0;
+            virtual int Connect(const char * addr, short int port) = 0;
             virtual int Reconnect() {return 0;};
             virtual int Disconnect();
             bool IsConnected();
@@ -140,7 +140,7 @@ class client: public baseSocket
 
         //!@name Connecting and disconnecting methods
         //@{
-            int Connect(char * addr, short int port = 2048);
+            int Connect(const char * addr, short int port = 2048);
         //@}
 };
 
@@ -159,7 +159,7 @@ class server: public baseSocket
 
         //!@name Connecting and disconnecting methods
         //@{
-            int Connect(char * addr, short int port = 2048);
+            int Connect(const char * addr, short int port = 2048);
             int Disconnect();
             int Reconnect();
         //@}

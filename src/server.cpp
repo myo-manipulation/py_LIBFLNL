@@ -20,7 +20,7 @@
 //! \return 0 if OK
 //! \return -1 if bind() error
 //! \return -2 if error creating the accepting thread
-int server::Connect(char * addr, short int port)
+int server::Connect(const char * addr, short int port)
 {
     //Initialise server address and ports
     sin.sin_addr.s_addr = inet_addr(addr);
