@@ -60,16 +60,19 @@ int baseSocket::Disconnect() {
     pthread_cancel(ReceivingThread);
     Connected=false;
 
-    int ret=close(Socket);
-    if(ret==0) {
-        printf("FLNL::Disconnected.\n");
-#ifdef WINDOWS
-        WSACleanup();
-#endif
-    } else {
-        printf("FLNL::Error closing connection.\n");
+    int ret=0;
+    if(Socket>0) {
+        ret=close(Socket);
+        if(ret==0) {
+            Socket = -1;
+            printf("FLNL::Disconnected.\n");
+    #ifdef WINDOWS
+            WSACleanup();
+    #endif
+        } else {
+            printf("FLNL::Error closing connection.\n");
+        }
     }
-
     return ret;
 }
 

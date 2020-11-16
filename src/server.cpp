@@ -78,17 +78,22 @@ int server::Disconnect()
     Connected=false;
     Waiting=false;
 
-    int ret=close(Socket);
-    if(ret==0) {
-        #ifdef VERBOSE
-        printf("FLNL::Disconnected.\n");
-        #endif
-        #ifdef WINDOWS
-            WSACleanup();
-        #endif
-    }
-    else {
-        printf("FLNL::Error closing connection.\n");
+
+    int ret=0;
+    if(Socket>0) {
+        ret=close(Socket);
+        if(ret==0) {
+            Socket = -1;
+            #ifdef VERBOSE
+            printf("FLNL::Disconnected.\n");
+            #endif
+            #ifdef WINDOWS
+                WSACleanup();
+            #endif
+        }
+        else {
+            printf("FLNL::Error closing connection.\n");
+        }
     }
 
     return ret;
