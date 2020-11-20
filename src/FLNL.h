@@ -118,7 +118,8 @@ class baseSocket
         char * ReceivedCmd;
         double * ReceivedCmdParams;
         bool IsCmd;
-        pthread_mutex_t received_mutex;                         //!< Mutex protecting read/writes to received values
+        pthread_mutex_t ReceivedMutex;                         //!< Mutex protecting read/writes to received values
+        pthread_mutex_t ReceivedCmdMutex;                     //!< Mutex protecting read/writes to received cmds
         pthread_t ReceivingThread;                              //!< Receiving pthread
 
     private:
