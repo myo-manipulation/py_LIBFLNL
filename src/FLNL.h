@@ -56,6 +56,9 @@
 #define CMD_SIZE 4              //!< Commands length in chars
 //#define VERBOSE //Talkative ? (connection, every missed message...)
 
+const double HANDSHAKE_VALUE = 42.0+M_PI;
+const std::string HANDSHAKE_CMD("Hand");
+
 void * receiving(void *c);
 
 //! A network base class able to send and receive data asynchronously as well as basic commands

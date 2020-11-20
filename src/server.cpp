@@ -99,7 +99,7 @@ int server::Disconnect()
     return ret;
 }
 
-//! Thread function waiting for a client connection
+//! Thread function waiting for a client connection: terminates when a client is connected
 //! \param c : A pointer on server object
 //! \return NULL
 void * accepting(void * c)
