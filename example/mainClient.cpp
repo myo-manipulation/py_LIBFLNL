@@ -10,7 +10,7 @@ int main()
 	usleep(2000000);
     client *monClient;
     monClient=new client();
-    if(monClient->Connect("192.168.1.100")!=0)
+    if(monClient->Connect("192.168.7.2")!=0)
     {
         exit(-1);
     }
@@ -48,7 +48,7 @@ int main()
         }
 
         if(rand()%1000==1)
-            monClient->Send("move", {2.56});
+            monClient->Send("GTNS", {2.56});
 
         usleep(10);
     }
