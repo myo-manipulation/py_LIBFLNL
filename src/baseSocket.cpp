@@ -2,13 +2,13 @@
  * \file baseSocket.cpp
  * \brief Network base class implementation
  * \author Vincent Crocher
- * \version 1.1
- * \date November 2020
+ * \version 1.2
+ * \date October 2021
  *
  *
  */
 
-#include "FLNL.h"
+#include "../include/FLNL.h"
 
 /*-----------------------------------------------------------------------------------------------------------------*/
 /*#########################################   CONSTRUCTOR AND DESTRUCTOR   ########################################*/

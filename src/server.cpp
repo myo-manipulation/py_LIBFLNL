@@ -2,13 +2,13 @@
  * \file server.cpp
  * \brief Network server class implementation
  * \author Vincent Crocher
- * \version 0.8
- * \date July 2020
+ * \version 1.2
+ * \date October 2021
  *
  *
  */
 
-#include "FLNL.h"
+#include "../include/FLNL.h"
 
 
 /*-----------------------------------------------------------------------------------------------------------------*/
