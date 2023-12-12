@@ -11,7 +11,7 @@ int main()
     server *monServer;
     monServer=new server();
 
-    if(monServer->Connect("192.168.1.100")!=0)
+    if(monServer->Connect("127.0.0.1", 2048)!=0)
     {
         exit(-1);
     }

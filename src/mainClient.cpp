@@ -10,7 +10,7 @@ int main()
 	usleep(2000000);
     client *monClient;
     monClient=new client();
-    if(monClient->Connect("192.168.7.2")!=0)
+    if(monClient->Connect("127.0.0.1")!=0)
     {
         exit(-1);
     }
