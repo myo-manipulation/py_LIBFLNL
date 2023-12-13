@@ -17,7 +17,7 @@ int main()
 
     std::vector<double> i({0,0,0});
     float m=0;
-    std::vector<double> a(6);
+    std::vector<double> a(9);
     double t;
     auto t0 = std::chrono::steady_clock::now();
 
@@ -31,14 +31,14 @@ int main()
         if(monClient->IsReceivedValues())
         {
             monClient->GetReceivedValues(a);
-            std::cout << t << " =? " << a[0] << " " << t-a[0] << std::endl;
-            /*for(int k=0; k<6; k++)
+            // std::cout << t << " =? " << a[0] << " " << t-a[0] << std::endl;
+            for(int k=0; k<9; k++)
                 std::cout << a[k] << "\t";
-            std::cout << std::endl;*/
+            std::cout << std::endl;
         }
         m+=0.00;
         i[2]=-4.*a[5];
-        monClient->Send(i);
+        // monClient->Send(i);
 
         if(monClient->IsReceivedCmd())
         {
@@ -48,7 +48,7 @@ int main()
         }
 
         if(rand()%1000==1)
-            monClient->Send("GTNS", {2.56});
+            // monClient->Send("GTNS", {2.56});
 
         usleep(10);
     }
